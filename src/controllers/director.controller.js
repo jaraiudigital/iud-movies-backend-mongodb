@@ -1,40 +1,50 @@
-const db = require('../config/db');
+const Director = require('../models/director.model');
 
 // Obtener todos los directores
 exports.obtenerTodos = async (req, res) => {
     try {
-        const [rows] = await db.query('SELECT * FROM directores');
-        res.json(rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        const directores = await Director.find().sort({ fechaCreacion: -1 });
+        res.json(directores);
+    } catch (error) {
+        res.status(500).json({ mensaje: 'Error al obtener los directores', error: error.message });
     }
 };
 
-// Crear un nuevo director
+// Crear un director
 exports.crear = async (req, res) => {
-    const { nombres, estado } = req.body;
     try {
-        const [result] = await db.query(
-            'INSERT INTO directores (nombres, estado) VALUES (?, ?)',
-            [nombres, estado || 'Activo']
-        );
-        res.status(201).json({ id: result.insertId, message: 'Director creado exitosamente' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        const director = new Director(req.body);
+        await director.save();
+        res.status(201).json(director);
+    } catch (error) {
+        res.status(500).json({ mensaje: 'Error al crear el director', error: error.message });
     }
 };
 
-// Actualizar un director existente
+// Actualizar director por ID
 exports.actualizar = async (req, res) => {
-    const { id } = req.params;
-    const { nombres, estado } = req.body;
     try {
-        await db.query(
-            'UPDATE directores SET nombres=?, estado=? WHERE id=?',
-            [nombres, estado, id]
-        );
-        res.json({ message: 'Director actualizado correctamente' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        const { id } = req.params;
+        req.body.fechaActualizacion = new Date();
+
+        const director = await Director.findByIdAndUpdate(id, req.body, { new: true });
+        if (!director) return res.status(404).json({ mensaje: 'Director no encontrado' });
+
+        res.json(director);
+    } catch (error) {
+        res.status(500).json({ mensaje: 'Error al actualizar el director', error: error.message });
+    }
+};
+
+// Eliminar director por ID
+exports.eliminar = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const director = await Director.findByIdAndDelete(id);
+        if (!director) return res.status(404).json({ mensaje: 'Director no encontrado' });
+
+        res.json({ mensaje: 'Director eliminado correctamente' });
+    } catch (error) {
+        res.status(500).json({ mensaje: 'Error al eliminar el director', error: error.message });
     }
 };

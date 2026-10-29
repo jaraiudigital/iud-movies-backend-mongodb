@@ -1,40 +1,55 @@
-const db = require('../config/db');
+const Tipo = require('../models/tipo.model');
 
-// Obtener todos los tipos (Serie, Película, etc.)
+// Obtener todos los tipos
 exports.obtenerTodos = async (req, res) => {
     try {
-        const [rows] = await db.query('SELECT * FROM tipos');
-        res.json(rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        const tipos = await Tipo.find().sort({ fechaCreacion: -1 });
+        res.json(tipos);
+    } catch (error) {
+        res.status(500).json({ mensaje: 'Error al obtener los tipos', error: error.message });
     }
 };
 
-// Crear un nuevo tipo
+// Crear un tipo
 exports.crear = async (req, res) => {
-    const { nombre, descripcion } = req.body;
     try {
-        const [result] = await db.query(
-            'INSERT INTO tipos (nombre, descripcion) VALUES (?, ?)',
-            [nombre, descripcion]
-        );
-        res.status(201).json({ id: result.insertId, message: 'Tipo creado exitosamente' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        const { nombre } = req.body;
+
+        const existeNombre = await Tipo.findOne({ nombre });
+        if (existeNombre) return res.status(400).json({ mensaje: 'El tipo ya existe' });
+
+        const tipo = new Tipo(req.body);
+        await tipo.save();
+        res.status(201).json(tipo);
+    } catch (error) {
+        res.status(500).json({ mensaje: 'Error al crear el tipo', error: error.message });
     }
 };
 
-// Actualizar un tipo existente
+// Actualizar tipo por ID
 exports.actualizar = async (req, res) => {
-    const { id } = req.params;
-    const { nombre, descripcion } = req.body;
     try {
-        await db.query(
-            'UPDATE tipos SET nombre=?, descripcion=? WHERE id=?',
-            [nombre, descripcion, id]
-        );
-        res.json({ message: 'Tipo actualizado correctamente' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        const { id } = req.params;
+        req.body.fechaActualizacion = new Date();
+
+        const tipo = await Tipo.findByIdAndUpdate(id, req.body, { new: true });
+        if (!tipo) return res.status(404).json({ mensaje: 'Tipo no encontrado' });
+
+        res.json(tipo);
+    } catch (error) {
+        res.status(500).json({ mensaje: 'Error al actualizar el tipo', error: error.message });
+    }
+};
+
+// Eliminar tipo por ID
+exports.eliminar = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const tipo = await Tipo.findByIdAndDelete(id);
+        if (!tipo) return res.status(404).json({ mensaje: 'Tipo no encontrado' });
+
+        res.json({ mensaje: 'Tipo eliminado correctamente' });
+    } catch (error) {
+        res.status(500).json({ mensaje: 'Error al eliminar el tipo', error: error.message });
     }
 };

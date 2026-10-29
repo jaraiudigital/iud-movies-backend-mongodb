@@ -1,25 +1,13 @@
-const mysql = require('mysql2/promise');
-require('dotenv').config();
+const mongoose = require('mongoose');
 
-const pool = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'iud_movies_db',
-    port: process.env.DB_PORT || 3306,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-});
+const getConnection = async () => {
+    try {
+        await mongoose.connect(process.env.MONGO_URI);
+        console.log('✅ Conexión exitosa a MongoDB Atlas');
+    } catch (error) {
+        console.error('❌ Error de conexión a MongoDB Atlas:', error.message);
+        process.exit(1);
+    }
+};
 
-// Prueba automática de conexión al iniciar
-pool.getConnection()
-    .then(connection => {
-        console.log('✅ Conexión exitosa a la base de datos MySQL:', process.env.DB_NAME || 'iud_movies_db');
-        connection.release();
-    })
-    .catch(err => {
-        console.error('❌ Error de conexión a MySQL:', err.message);
-    });
-
-module.exports = pool;
+module.exports = { getConnection };

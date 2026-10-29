@@ -1,71 +1,62 @@
-const db = require('../config/db');
+const Media = require('../models/media.model');
 
+// Obtener todas las películas/series poblando relaciones
 exports.obtenerTodas = async (req, res) => {
     try {
-        const query = `
-            SELECT m.*, 
-                   IFNULL(g.nombre, 'Sin Género') AS genero_nombre, 
-                   IFNULL(d.nombres, 'Sin Director') AS director_nombre, 
-                   IFNULL(p.nombre, 'Sin Productora') AS productora_nombre, 
-                   IFNULL(t.nombre, 'Sin Tipo') AS tipo_nombre
-            FROM medias m
-            LEFT JOIN generos g ON m.genero_id = g.id
-            LEFT JOIN directores d ON m.director_id = d.id
-            LEFT JOIN productoras p ON m.productora_id = p.id
-            LEFT JOIN tipos t ON m.tipo_id = t.id
-            ORDER BY m.id DESC
-        `;
-        const [rows] = await db.query(query);
-        res.json(rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        const medias = await Media.find()
+            .populate('genero', 'nombre estado')
+            .populate('director', 'nombres estado')
+            .populate('productora', 'nombre estado')
+            .populate('tipo', 'nombre');
+        res.json(medias);
+    } catch (error) {
+        res.status(500).json({ mensaje: 'Error al obtener registros', error: error.message });
     }
 };
 
+// Crear nueva película/serie
 exports.crear = async (req, res) => {
-    const { serial, titulo, sinopsis, url, imagen_portada, ano_estreno, genero_id, director_id, productora_id, tipo_id } = req.body;
-
     try {
-        const query = `
-            INSERT INTO medias (serial, titulo, sinopsis, url, imagen_portada, ano_estreno, genero_id, director_id, productora_id, tipo_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `;
-        const [result] = await db.query(query, [serial, titulo, sinopsis, url, imagen_portada, ano_estreno, genero_id, director_id, productora_id, tipo_id]);
+        const { serial, url } = req.body;
 
-        res.status(201).json({ id: result.insertId, message: 'Media creada exitosamente' });
-    } catch (err) {
-        if (err.code === 'ER_DUP_ENTRY') {
-            return res.status(400).json({ error: 'El Serial o la URL ya se encuentran registrados.' });
-        }
-        res.status(500).json({ error: err.message });
+        const existeSerial = await Media.findOne({ serial });
+        if (existeSerial) return res.status(400).json({ mensaje: 'El serial ya existe' });
+
+        const existeUrl = await Media.findOne({ url });
+        if (existeUrl) return res.status(400).json({ mensaje: 'La URL ya existe' });
+
+        const media = new Media(req.body);
+        await media.save();
+        res.status(201).json(media);
+    } catch (error) {
+        res.status(500).json({ mensaje: 'Error al crear el registro', error: error.message });
     }
 };
 
+// Actualizar película/serie por ID
 exports.actualizar = async (req, res) => {
-    const { id } = req.params;
-    const { serial, titulo, sinopsis, url, imagen_portada, ano_estreno, genero_id, director_id, productora_id, tipo_id } = req.body;
-
     try {
-        const query = `
-            UPDATE medias 
-            SET serial = ?, titulo = ?, sinopsis = ?, url = ?, imagen_portada = ?, ano_estreno = ?, genero_id = ?, director_id = ?, productora_id = ?, tipo_id = ?
-            WHERE id = ?
-        `;
-        const [result] = await db.query(query, [serial, titulo, sinopsis, url, imagen_portada, ano_estreno, genero_id, director_id, productora_id, tipo_id, id]);
+        const { id } = req.params;
+        req.body.fechaActualizacion = new Date();
 
-        if (result.affectedRows === 0) return res.status(404).json({ error: 'Media no encontrada' });
-        res.json({ message: 'Media actualizada correctamente', id });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        const media = await Media.findByIdAndUpdate(id, req.body, { new: true });
+        if (!media) return res.status(404).json({ mensaje: 'Media no encontrada' });
+
+        res.json(media);
+    } catch (error) {
+        res.status(500).json({ mensaje: 'Error al actualizar', error: error.message });
     }
 };
 
+// Eliminar película/serie por ID
 exports.eliminar = async (req, res) => {
-    const { id } = req.params;
     try {
-        await db.query('DELETE FROM medias WHERE id = ?', [id]);
-        res.json({ message: 'Media eliminada correctamente' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        const { id } = req.params;
+        const media = await Media.findByIdAndDelete(id);
+        if (!media) return res.status(404).json({ mensaje: 'Media no encontrada' });
+
+        res.json({ mensaje: 'Media eliminada correctamente' });
+    } catch (error) {
+        res.status(500).json({ mensaje: 'Error al eliminar', error: error.message });
     }
 };
